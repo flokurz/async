@@ -7,13 +7,17 @@ use Spatie\Async\Process\ParallelProcess;
 
 class PoolStatus
 {
-    protected $pool;
+    /** @var Pool */
+    protected Pool $pool;
 
     public function __construct(Pool $pool)
     {
         $this->pool = $pool;
     }
 
+    /**
+     * @return string
+     */
     public function __toString(): string
     {
         return $this->lines(
@@ -22,11 +26,18 @@ class PoolStatus
         );
     }
 
+    /**
+     * @param string ...$lines
+     * @return string
+     */
     protected function lines(string ...$lines): string
     {
         return implode(PHP_EOL, $lines);
     }
 
+    /**
+     * @return string
+     */
     protected function summaryToString(): string
     {
         $queue = $this->pool->getQueue();
@@ -41,6 +52,9 @@ class PoolStatus
             .' - timeout: '.count($timeouts);
     }
 
+    /**
+     * @return string
+     */
     protected function failedToString(): string
     {
         return (string) array_reduce($this->pool->getFailed(), function ($currentStatus, ParallelProcess $process) {
@@ -50,7 +64,7 @@ class PoolStatus
                 $output = get_class($output->asThrowable()).': '.$output->asThrowable()->getMessage();
             }
 
-            return $this->lines((string) $currentStatus, "{$process->getPid()} failed with {$output}");
+            return $this->lines((string) $currentStatus, "{$process->getPid()} failed with $output");
         });
     }
 }

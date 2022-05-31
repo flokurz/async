@@ -3,56 +3,67 @@
 namespace Spatie\Async\Runtime;
 
 use Closure;
+use Laravel\SerializableClosure\Exceptions\PhpVersionNotSupportedException;
 use Laravel\SerializableClosure\SerializableClosure;
 use Spatie\Async\Pool;
 use Spatie\Async\Process\ParallelProcess;
 use Spatie\Async\Process\Runnable;
 use Spatie\Async\Process\SynchronousProcess;
+use Spatie\Async\Task;
 use Symfony\Component\Process\Process;
 
 class ParentRuntime
 {
     /** @var bool */
-    protected static $isInitialised = false;
+    protected static bool $isInitialised = false;
+
+    /** @var string|bool */
+    protected static string|bool $autoloader;
 
     /** @var string */
-    protected static $autoloader;
+    protected static string $childProcessScript;
 
-    /** @var string */
-    protected static $childProcessScript;
+    /** @var int */
+    protected static int $currentId = 0;
 
-    protected static $currentId = 0;
+    /** @var null|false|int */
+    protected static int|null|false $myPid = null;
 
-    protected static $myPid = null;
-
-    public static function init(string $autoloader = null)
+    /**
+     * @param string|null $autoloader
+     * @return void
+     */
+    public static function init(string $autoloader = null): void
     {
-        if (! $autoloader) {
+        if (null === $autoloader) {
             $existingAutoloaderFiles = array_filter([
                 __DIR__.'/../../../../autoload.php',
                 __DIR__.'/../../../autoload.php',
                 __DIR__.'/../../vendor/autoload.php',
                 __DIR__.'/../../../vendor/autoload.php',
-            ], function (string $path) {
+            ], static function (string $path) {
                 return file_exists($path);
             });
 
-            $autoloader = reset($existingAutoloaderFiles);
+            $tempAutoloader = reset($existingAutoloaderFiles);
+        } else {
+            $tempAutoloader = $autoloader;
         }
 
-        self::$autoloader = $autoloader;
+        self::$autoloader = $tempAutoloader;
         self::$childProcessScript = __DIR__.'/ChildRuntime.php';
 
         self::$isInitialised = true;
     }
 
     /**
-     * @param \Spatie\Async\Task|callable $task
+     * @param callable|Task $task
      * @param int|null $outputLength
-     *
-     * @return \Spatie\Async\Process\Runnable
+     * @param string|null $binary
+     * @return Runnable
+     * @throws PhpVersionNotSupportedException
      */
-    public static function createProcess($task, ?int $outputLength = null, ?string $binary = 'php'): Runnable
+    public static function createProcess(callable|Task $task, ?int $outputLength = null, ?string $binary = 'php'): Runnable
     {
         if (! self::$isInitialised) {
             self::init();
@@ -74,32 +85,41 @@ class ParentRuntime
     }
 
     /**
-     * @param \Spatie\Async\Task|callable $task
-     *
+     * @param callable|Task $task
      * @return string
+     * @throws PhpVersionNotSupportedException
      */
-    public static function encodeTask($task): string
+    public static function encodeTask(callable|Task $task): string
     {
         if ($task instanceof Closure) {
-            $task = new SerializableClosure($task);
+            $serializableTask = new SerializableClosure($task);
+        } else {
+            $serializableTask = $task;
         }
 
-        return base64_encode(serialize($task));
+        return base64_encode(serialize($serializableTask));
     }
 
-    public static function decodeTask(string $task)
+    /**
+     * @param string $task
+     * @return mixed
+     */
+    public static function decodeTask(string $task): mixed
     {
-        return unserialize(base64_decode($task));
+        return unserialize(base64_decode($task), ['allowed_classes' => true]);
     }
 
+    /**
+     * @return string
+     */
     protected static function getId(): string
     {
         if (self::$myPid === null) {
             self::$myPid = getmypid();
         }
 
-        self::$currentId += 1;
+        ++self::$currentId;
 
-        return (string) self::$currentId.(string) self::$myPid;
+        return self::$currentId . self::$myPid;
     }
 }

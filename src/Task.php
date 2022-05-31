@@ -8,7 +8,10 @@ abstract class Task
 
     abstract public function run();
 
-    public function __invoke()
+    /**
+     * @return mixed
+     */
+    public function __invoke(): mixed
     {
         $this->configure();
 

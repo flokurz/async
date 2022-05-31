@@ -2,15 +2,25 @@
 
 namespace Spatie\Async\Process;
 
+use ReflectionException;
 use ReflectionFunction;
 use Throwable;
 
 trait ProcessCallbacks
 {
-    protected $successCallbacks = [];
-    protected $errorCallbacks = [];
-    protected $timeoutCallbacks = [];
+    /** @var array */
+    protected array $successCallbacks = [];
 
+    /** @var array */
+    protected array $errorCallbacks = [];
+
+    /** @var array */
+    protected array $timeoutCallbacks = [];
+
+    /**
+     * @param callable $callback
+     * @return ProcessCallbacks|ParallelProcess|SynchronousProcess
+     */
     public function then(callable $callback): self
     {
         $this->successCallbacks[] = $callback;
@@ -18,6 +28,10 @@ trait ProcessCallbacks
         return $this;
     }
 
+    /**
+     * @param callable $callback
+     * @return ProcessCallbacks|ParallelProcess|SynchronousProcess
+     */
     public function catch(callable $callback): self
     {
         $this->errorCallbacks[] = $callback;
@@ -25,6 +39,10 @@ trait ProcessCallbacks
         return $this;
     }
 
+    /**
+     * @param callable $callback
+     * @return ProcessCallbacks|ParallelProcess|SynchronousProcess
+     */
     public function timeout(callable $callback): self
     {
         $this->timeoutCallbacks[] = $callback;
@@ -32,6 +50,10 @@ trait ProcessCallbacks
         return $this;
     }
 
+    /**
+     * @return mixed|void
+     * @throws Throwable
+     */
     public function triggerSuccess()
     {
         if ($this->getErrorOutput()) {
@@ -43,13 +65,17 @@ trait ProcessCallbacks
         $output = $this->getOutput();
 
         foreach ($this->successCallbacks as $callback) {
-            call_user_func_array($callback, [$output]);
+            $callback($output);
         }
 
         return $output;
     }
 
-    public function triggerError()
+    /**
+     * @return void
+     * @throws Throwable
+     */
+    public function triggerError(): void
     {
         $exception = $this->resolveErrorOutput();
 
@@ -62,21 +88,33 @@ trait ProcessCallbacks
                 continue;
             }
 
-            call_user_func_array($callback, [$exception]);
+            $callback($exception);
 
             break;
         }
     }
 
+    /**
+     * @return Throwable
+     */
     abstract protected function resolveErrorOutput(): Throwable;
 
-    public function triggerTimeout()
+    /**
+     * @return void
+     */
+    public function triggerTimeout(): void
     {
         foreach ($this->timeoutCallbacks as $callback) {
             call_user_func_array($callback, []);
         }
     }
 
+    /**
+     * @param Throwable $throwable
+     * @param callable $callable
+     * @return bool
+     * @throws ReflectionException
+     */
     protected function isAllowedThrowableType(Throwable $throwable, callable $callable): bool
     {
         $reflection = new ReflectionFunction($callable);

@@ -12,31 +12,27 @@ interface Runnable
 
     /**
      * @param callable $callback
-     *
-     * @return static
+     * @return Runnable
      */
-    public function then(callable $callback);
+    public function then(callable $callback): self;
 
     /**
      * @param callable $callback
-     *
-     * @return static
+     * @return Runnable
      */
-    public function catch(callable $callback);
+    public function catch(callable $callback): self;
 
     /**
      * @param callable $callback
-     *
-     * @return static
+     * @return Runnable
      */
-    public function timeout(callable $callback);
+    public function timeout(callable $callback): self;
 
     /**
-     * @param int|float $timeout The timeout in seconds
-     *
+     * @param float|int $timeout The timeout in seconds
      * @return mixed
      */
-    public function stop($timeout = 0);
+    public function stop(float|int $timeout = 0): mixed;
 
     public function getOutput();
 
